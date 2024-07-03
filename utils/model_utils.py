@@ -100,7 +100,7 @@ def get_sam_predictor(variant: str, device: str | int) -> SamPredictor:
     
     if variant == "mobilesam":
         from MobileSAM.setup_mobile_sam import setup_model
-        MOBILE_SAM_CHECKPOINT_PATH = os.path.join(GSA_PATH, "./EfficientSAM/mobile_sam.pt")
+        MOBILE_SAM_CHECKPOINT_PATH = os.path.join(GSA_PATH, "EfficientSAM/mobile_sam.pt")
         checkpoint = torch.load(MOBILE_SAM_CHECKPOINT_PATH)
         mobile_sam = setup_model()
         mobile_sam.load_state_dict(checkpoint, strict=True)

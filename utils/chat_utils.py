@@ -9,13 +9,16 @@ import json
 from arguments import get_args
 
 import openai
-from openai.error import OpenAIError
-openai.organization = "org-ZCl0HLFc8HhQCrrtvdiPccEz"
-openai.api_key = "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"
+from openai import OpenAIError
+# openai.organization = "org-ZCl0HLFc8HhQCrrtvdiPccEz"
+# openai.api_key = "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"
+import os
+openai.api_key = os.getenv("OPENAI_API_KEY")
+openai.api_base = "https://gptproxy.llmpaas.woa.com/v1" #只增加这一行即可
 
 gpt_name = [
             'text-davinci-003',
-            'gpt-3.5-turbo-0125',
+            'gpt-3.5-turbo',  # 'gpt-3.5-turbo-0125'
             'gpt-4o',
             'gpt-4-turbo'
         ]           

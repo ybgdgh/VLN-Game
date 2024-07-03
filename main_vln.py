@@ -139,7 +139,6 @@ def main(args, send_queue, receive_queue):
             # dd_e_time = time.time()
             # print(' time:%.3fs\n'%(dd_e_time - dd_s_time)) 
 
-
         if (
             action == 0 and 
             env.get_metrics()["spl"]

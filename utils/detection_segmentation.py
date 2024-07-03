@@ -165,7 +165,7 @@ class Object_Detection_and_Segmentation():
             # Using GroundingDINO to detect and SAM to segment
             detections = self.grounding_dino_model.predict_with_classes(
                 image=image, # This function expects a BGR image...
-                classes=classes,
+                classes=classes,  # TODO 是通过提示文本的label然后对图像进行检测
                 box_threshold=self.args.box_threshold,
                 text_threshold=self.args.text_threshold,
             )
@@ -242,5 +242,22 @@ class Object_Detection_and_Segmentation():
 
                 get_results = True  
  
-            
-        return get_results, detections
+
+        # 这个地方只会检测语言里面里包含的label
+        # from utils.vis import vis_result_fast
+        # result = vis_result_fast(image, detections, classes)
+
+        # 其实这个时候就应该把检测结果给标在图上然后返回当前的image
+        from utils.vis import vis_result_fast
+        result_image = vis_result_fast(image, detections, classes)
+
+        from PIL import Image
+        pil_image = Image.fromarray(np.uint8(result_image))
+        # pil_image.show()
+        output_file = "/home/rickyyzliu/workspace/embodied-AI/habitat/output_image.jpg" 
+        pil_image.save(output_file)
+
+        return get_results, detections, result_image
+
+
+
