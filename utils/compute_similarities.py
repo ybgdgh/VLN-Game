@@ -91,11 +91,18 @@ def merge_detections_to_objects(
     objects: MapObjectList, 
     agg_sim: torch.Tensor
 ) -> MapObjectList:
+    
+    # 定义一个
+    detection_to_object = {}
+
     # Iterate through all detections and merge them into objects
     for i in range(agg_sim.shape[0]):
         # If not matched to any object, add it as a new object
         if agg_sim[i].max() == float('-inf'):
             objects.append(detection_list[i])
+            
+            detection_to_object[detection_list[i]["mask_idx"][0]] = len(objects)-1
+
         # Merge with most similar existing object
         else:
             j = agg_sim[i].argmax()
@@ -103,8 +110,10 @@ def merge_detections_to_objects(
             matched_obj = objects[j]
             merged_obj = merge_obj2_into_obj1(cfg, matched_obj, matched_det, run_dbscan=False)
             objects[j] = merged_obj
+
+            detection_to_object[detection_list[i]["mask_idx"][0]] = j
             
-    return objects
+    return objects, detection_to_object
 
 cmap = matplotlib.colormaps.get_cmap("turbo")
 def color_by_clip_sim(text_queries, objects, clip_model, clip_tokenizer, color_set = True) :

@@ -18,7 +18,7 @@ def get_args():
                         help='path to dump models and log (default: ./tmp/)')
     parser.add_argument('--exp_name', type=str, default="objectnav-yolo",
                         help='experiment name (default: exp1)')
-    parser.add_argument('-v', '--visualize', type=int, default=0,
+    parser.add_argument('-v', '--visualize', type=int, default=2,
                         help="""1: Render the observation and
                                    the predicted semantic map,
                                 2: Render the observation with semantic
@@ -86,7 +86,7 @@ def get_args():
 
 
     # LLM setting
-    parser.add_argument('--vln_mode', type=str, default="llm",
+    parser.add_argument('--vln_mode', type=str, default="clip",
                         choices=['clip', 'llm', "llm_game"])
     parser.add_argument('--gpt_type', type=int, default=1,
                         help="""0: text-davinci-003

@@ -116,7 +116,7 @@ def create_object_pcd(depth_array, mask, cam_K, image, obj_color=None) -> o3d.ge
     pcd = o3d.geometry.PointCloud()
     pcd.points = o3d.utility.Vector3dVector(points)
     pcd.colors = o3d.utility.Vector3dVector(colors)
-    
+
     return pcd
 
 def pcd_denoise_dbscan(pcd: o3d.geometry.PointCloud, eps=0.02, min_points=10) -> o3d.geometry.PointCloud:
@@ -578,6 +578,7 @@ def gobs_to_detection_list(
             # 'text_ft': to_tensor(gobs['text_feats'][mask_idx]),
         }
         
+
         if class_name in BG_CLASSES:
             bg_detection_list.append(detected_object)
         else:

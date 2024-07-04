@@ -27,7 +27,7 @@ from habitat.config.default import get_config
 from utils.shortest_path_follower import ShortestPathFollowerCompat
 from utils.task import VLObjectNavEpisode
 from utils.vis_gui import ReconstructionWindow
-from agents.vlnav_agent import VLObjectNav_Agent
+from agents.vlmnav_agent import VLMNav_Agent
 from habitat.utils.visualizations import maps
 
 
@@ -75,7 +75,7 @@ def main(args, send_queue, receive_queue):
         env._sim, 0.3, False
     )
 
-    agent = VLObjectNav_Agent(args, follower)
+    agent = VLMNav_Agent(args, follower)
 
     agg_metrics: Dict = defaultdict(float)
 
@@ -96,16 +96,11 @@ def main(args, send_queue, receive_queue):
     
     while count_episodes < num_episodes:
         obs = env.reset()
-        
         agent.reset()
         print("Instrcution: ", obs["instruction"]['text'])
-
         image = transform_rgb_bgr(obs["rgb"])  # 224*224*3
         image_rgb = cv2.cvtColor(obs["rgb"], cv2.COLOR_BGR2RGB) 
-        # cv2.imshow("RGB0", obs["rgb"])
-
         logging.info(obs["instruction"]['text'])
-
         if args.save_video:
             video_save_path = '{}/{}/episodes_video/eps_{}_vis.mp4'.format(
                 args.dump_location, args.exp_name, agent.episode_n)
@@ -114,28 +109,18 @@ def main(args, send_queue, receive_queue):
         count_steps = 0
         start_ep = time.time()
         while not env.episode_over:
-
-            # dd_s_time = time.time()
             # 012345  停, 前进, 左, 右, 上, 下
             agent_state = env.sim.get_agent_state()
- 
+
+            # 每10个step询问一次
             use_vlm = count_steps % 10 == 0
             action = agent.act(obs, agent_state, use_vlm, send_queue, receive_queue)
 
             if action == None:
                 continue
             obs = env.step(action)
-
-            # cv2.imshow("RGB", transform_rgb_bgr(obs["rgb"]))
-            # top_down_map = draw_top_down_map(env.get_metrics(), obs["rgb"].shape[0])
-            # cv2.imshow("top_down_map", top_down_map)
-            # cv2.waitKey(1)
-
             count_steps += 1
             
-            # dd_e_time = time.time()
-            # print(' time:%.3fs\n'%(dd_e_time - dd_s_time)) 
-
         if (
             action == 0 and 
             env.get_metrics()["spl"]
@@ -150,9 +135,7 @@ def main(args, send_queue, receive_queue):
                 fail_case['collision'] += 1
             else:
                 fail_case['detection'] += 1
-
         count_episodes += 1
-
         end = time.time()
         time_elapsed = time.gmtime(end - start)
         log = " ".join([
@@ -188,10 +171,7 @@ def main(args, send_queue, receive_queue):
             imageio.mimsave(video_save_path, frames, fps=2)
             print(f"Video saved to {video_save_path}")
      
-        
-
     avg_metrics = {k: v / count_episodes for k, v in agg_metrics.items()}
-
     for stat_key in avg_metrics.keys():
         logger.info("{}: {:.3f}".format(stat_key, avg_metrics[stat_key]))
 
@@ -213,9 +193,6 @@ if __name__ == "__main__":
     receive_queue = Queue()
 
     if args.visualize:
-        # Create a thread for the Open3D visualization
         visualization = threading.Thread(target=visualization_thread, args=(send_queue, receive_queue,))
         visualization.start()
-
-    # Run ROS code in the main thread
     main(args, send_queue, receive_queue)

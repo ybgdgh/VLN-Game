@@ -6,6 +6,9 @@ import time
 import torchvision
 import supervision as sv
 
+from PIL import Image
+from utils.vis import vis_result_fast
+
 
 from utils.model_utils import(
     get_sam_predictor,
@@ -114,7 +117,7 @@ class Object_Detection_and_Segmentation():
                 self.classes = [cls for cls in self.classes if cls not in remove_classes]
             self.yolo_model_w_classes.set_classes(classes)
         
-    def detect(self, image, image_rgb, classes):
+    def detect(self, image, image_rgb, classes, save_image=False):
         
         get_results = False
         if self.args.detector == "dino":
@@ -243,19 +246,16 @@ class Object_Detection_and_Segmentation():
                 get_results = True  
  
 
-        # 这个地方只会检测语言里面里包含的label
-        # from utils.vis import vis_result_fast
-        # result = vis_result_fast(image, detections, classes)
-
         # 其实这个时候就应该把检测结果给标在图上然后返回当前的image
-        from utils.vis import vis_result_fast
-        result_image = vis_result_fast(image, detections, classes)
-
-        from PIL import Image
-        pil_image = Image.fromarray(np.uint8(result_image))
-        # pil_image.show()
-        output_file = "/home/rickyyzliu/workspace/embodied-AI/habitat/output_image.jpg" 
-        pil_image.save(output_file)
+        result_image = vis_result_fast(image, detections, classes, draw_bbox=False, draw_mask=False, draw_bbox_id=True)
+        if save_image:
+            pil_image = Image.fromarray(np.uint8(result_image))
+            output_file = "/home/rickyyzliu/workspace/embodied-AI/habitat/detect.jpg" 
+            pil_image.save(output_file)
+            
+            raw_file = "/home/rickyyzliu/workspace/embodied-AI/habitat/raw_img.jpg" 
+            pil_image = Image.fromarray(np.uint8(image))
+            pil_image.save(raw_file)
 
         return get_results, detections, result_image
 

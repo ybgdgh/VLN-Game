@@ -21,7 +21,8 @@ def vis_result_fast(
     color: Color | ColorPalette = ColorPalette.default(), 
     instance_random_color: bool = False,
     draw_bbox: bool = False,
-    draw_mask: bool = False
+    draw_mask: bool = False,
+    draw_bbox_id: bool = False,
 ) -> np.ndarray:
     '''
     Annotate the image with the detection results. 
@@ -55,8 +56,6 @@ def vis_result_fast(
     if draw_bbox:
         annotated_image = box_annotator.annotate(scene=annotated_image, detections=detections, labels=labels)
     
-
-    draw_bbox_id = True
     if draw_bbox_id:
         annotated_image = box_annotator.annotate_bbox_id(scene=annotated_image, detections=detections, labels=labels)
 

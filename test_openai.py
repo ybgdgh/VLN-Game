@@ -68,17 +68,18 @@ api_key = os.getenv("OPENAI_API_KEY")
 
 
 def ask_VLM(result_image=None, instruction=None):
-        
+
     # instruction = "A standing man wearing blue clothes."
     # instruction = "The pillow on the sofa."
-    instruction = "The table in front of the sofa."
+    instruction = "Table."
 
-    pil_image = Image.open("/home/rickyyzliu/workspace/embodied-AI/habitat/2.jpeg")
-    pil_segmented_image = Image.open("/home/rickyyzliu/workspace/embodied-AI/habitat/output_image.jpg")
-    
-    
-    
+    pil_image = Image.open("/home/rickyyzliu/workspace/embodied-AI/habitat/raw_img.jpg")
+    pil_segmented_image = Image.open(
+        "/home/rickyyzliu/workspace/embodied-AI/habitat/detect.jpg"
+    )
+
     import io
+
     # pil_image = Image.fromarray(np.uint8(result_image))
     # pil_image.show()
 
@@ -90,10 +91,7 @@ def ask_VLM(result_image=None, instruction=None):
     pil_segmented_image.save(segmented_buffered, format="JPEG")
     segmented_img_str = base64.b64encode(segmented_buffered.getvalue()).decode("utf-8")
 
-
-
     api_key = os.getenv("OPENAI_API_KEY")
-
 
     headers = {"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"}
 
@@ -156,19 +154,19 @@ def ask_VLM(result_image=None, instruction=None):
     #     "max_tokens": 20,  # 修改为适当的值
     # }
 
-
     payload = {
         "model": "gpt-4o",  # gpt-4o gpt-4-vision-preview
         "messages": [
             {
                 "role": "user",
                 "content": [
-                    {"type": "text", "text": f"Instruction: {instruction}. Here are two images. The first image shows what the robot sees, and the second image shows object segmentation annotations."},
+                    {
+                        "type": "text",
+                        "text": f"Instruction: {instruction}. Here are two images. The first image shows what the robot sees, and the second image shows object segmentation annotations.",
+                    },
                     {
                         "type": "image_url",
-                        "image_url": {
-                            "url": f"data:image/jpeg;base64,{img_str}"
-                        },
+                        "image_url": {"url": f"data:image/jpeg;base64,{img_str}"},
                     },
                     {
                         "type": "image_url",
@@ -176,13 +174,15 @@ def ask_VLM(result_image=None, instruction=None):
                             "url": f"data:image/jpeg;base64,{segmented_img_str}"
                         },
                     },
-                    {"type": "text", "text": "Please identify the obj_i in the images that corresponds to the target object described in the instruction and provide a reason. Please respond in the format: 'Answer: obj_i, Reason: ...'. Note: 1. If the target object is in the image but not marked by a bounding box, respond with 'Answer: false_1, Reason: object hear, bbox not hear'. 2. If the target object is not in the image at all, respond with 'Answer: false_2, Reason: object not hear'."}
+                    {
+                        "type": "text",
+                        "text": "Please identify the obj_i in the images that corresponds to the target object described in the instruction and provide a reason. Please respond in the format: 'Answer: obj_i, Reason: ...'. Note: 1. If the target object is in the image but not marked by a bounding box, respond with 'Answer: false_1, Reason: object hear, bbox not hear'. 2. If the target object is not in the image at all, respond with 'Answer: false_2, Reason: object not hear'.",
+                    },
                 ],
             }
         ],
         "max_tokens": 20,  # 修改为适当的值
     }
-
 
     response = requests.post(
         "https://gptproxy.llmpaas.woa.com/v1/chat/completions",
@@ -190,8 +190,79 @@ def ask_VLM(result_image=None, instruction=None):
         json=payload,
     )
 
-    print(response.json())
+    answer = response.json()["choices"][0]["message"]["content"]
+    answer_parts = answer.split(", Reason: ")
+    obj_i = answer_parts[0].split(": ")[1]
+    reason = answer_parts[1]
+
+    if obj_i == "false_1":
+        print("false_1")
+    elif obj_i == "false_2":
+        print("false_2")
+    else:
+        index = int(obj_i.split("_")[1])
+        print(f"index: {index}")
+
+
+    print(f"reason: {reason}")
+
+    return obj_i
 
 
 if __name__ == "__main__":
     ask_VLM()
+
+    # {
+    #     "choices": [
+    #         {
+    #             "content_filter_results": {
+    #                 "hate": {"filtered": False, "severity": "safe"},
+    #                 "self_harm": {"filtered": False, "severity": "safe"},
+    #                 "sexual": {"filtered": False, "severity": "safe"},
+    #                 "violence": {"filtered": False, "severity": "safe"},
+    #             },
+    #             "finish_reason": "stop",
+    #             "index": 0,
+    #             "logprobs": None,
+    #             "message": {
+    #                 "content": "Answer: false_1, Reason: object here, bbox not here.",
+    #                 "role": "assistant",
+    #             },
+    #         }
+    #     ],
+    #     "created": 1719973845,
+    #     "id": "chatcmpl-9gk3ZS0f00s87ATYWoeO2EOrGSfVC",
+    #     "model": "gpt-4o-2024-05-13",
+    #     "object": "chat.completion",
+    #     "prompt_filter_results": [
+    #         {
+    #             "prompt_index": 0,
+    #             "content_filter_result": {
+    #                 "jailbreak": {"filtered": False, "detected": False},
+    #                 "custom_blocklists": {"filtered": False, "details": []},
+    #             },
+    #         },
+    #         {
+    #             "prompt_index": 2,
+    #             "content_filter_result": {
+    #                 "sexual": {"filtered": False, "severity": "safe"},
+    #                 "violence": {"filtered": False, "severity": "safe"},
+    #                 "hate": {"filtered": False, "severity": "safe"},
+    #                 "self_harm": {"filtered": False, "severity": "safe"},
+    #                 "custom_blocklists": {"filtered": False, "details": []},
+    #             },
+    #         },
+    #         {
+    #             "prompt_index": 1,
+    #             "content_filter_result": {
+    #                 "sexual": {"filtered": False, "severity": "safe"},
+    #                 "violence": {"filtered": False, "severity": "safe"},
+    #                 "hate": {"filtered": False, "severity": "safe"},
+    #                 "self_harm": {"filtered": False, "severity": "safe"},
+    #                 "custom_blocklists": {"filtered": False, "details": []},
+    #             },
+    #         },
+    #     ],
+    #     "system_fingerprint": "fp_36b0c83da2",
+    #     "usage": {"completion_tokens": 15, "prompt_tokens": 844, "total_tokens": 859},
+    # }

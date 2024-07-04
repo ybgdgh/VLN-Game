@@ -90,20 +90,24 @@ class VLObjectNav_Agent(ObjectNav_Agent):
 
         # ------------------------------------------------------------------
 
-    def act(self, observations: Observations, agent_state, send_queue= Queue(), receive_queue= Queue()):
+    def act(self, observations: Observations, agent_state, use_vlm = False, send_queue= Queue(), receive_queue= Queue()):
         time_step_info = 'Mapping time (s): \n'
 
         preprocess_s_time = time.time()
         # ------------------------------------------------------------------
-        ##### At first step, get the object name and init the visualization
+        ##### 1. get the object name and init the visualization
         # ------------------------------------------------------------------
         # TODO 第一步是进行拆分
-        if self.l_step == 0 and False:
+        if self.l_step == 0:
             self.init_sim_position = agent_state.sensor_states["depth"].position
             self.init_agent_position = agent_state.position
             self.init_sim_rotation = quaternion.as_rotation_matrix(agent_state.sensor_states["depth"].rotation)
 
             self.text_queries = observations["instruction"]['text']
+            
+            # TODO 需要修改
+            self.text_queries = "table."
+
             self.all_objects = []
             self.landmark_data = []
 
@@ -111,11 +115,8 @@ class VLObjectNav_Agent(ObjectNav_Agent):
                 self.target_data = self.text_queries
             else:
                 if self.args.vln_mode == "llm":
-
                     self.chat_history_for_llm = []
-
                     self.chat_history_for_llm.append({"role": "system", "content": Instruction_system_prompt})
-
                     self.chat_history_for_llm.append({"role": "user", "content": self.text_queries})
                     response_message = chat_with_gpt(self.chat_history_for_llm, 2)
                     self.chat_history_for_llm.append({"role": "assistant", "content": response_message})
@@ -138,25 +139,14 @@ class VLObjectNav_Agent(ObjectNav_Agent):
             self.all_objects.append(self.target_data)
             # for key, value in self.landmark_data.items():
             #     self.all_objects.append(value["phrase"])
-
             print("self.all_objects: ", self.all_objects)  # 这是所有要找的包括 target和landmarks
-        
-        elif self.l_step == 0:
-            self.init_sim_position = agent_state.sensor_states["depth"].position
-            self.init_agent_position = agent_state.position
-            self.init_sim_rotation = quaternion.as_rotation_matrix(agent_state.sensor_states["depth"].rotation)
-            self.text_queries = observations["instruction"]['text']
-
-        # 假设改成不需要进行拆分
-        self.all_objects = ["table", "chair"]
 
         # ------------------------------------------------------------------
-        ##### Preprocess the observation
+        ##### 2. Preprocess the observation
         # ------------------------------------------------------------------
-
         image_rgb = observations['rgb']
-        image_rgb = Image.open("/home/rickyyzliu/workspace/embodied-AI/habitat/2.jpeg")
-        image_rgb = np.array(image_rgb)
+        # image_rgb = Image.open("/home/rickyyzliu/workspace/embodied-AI/habitat/characters.jpg")
+        # image_rgb = np.array(image_rgb)
 
         depth = observations['depth']
         image = transform_rgb_bgr(image_rgb) 
@@ -193,7 +183,7 @@ class VLObjectNav_Agent(ObjectNav_Agent):
         time_step_info += 'Preprocess time:%.3fs\n'%(preprocess_e_time - preprocess_s_time)
 
         # ------------------------------------------------------------------
-        ##### Object Set building
+        ##### 3. Object Set building
         # ------------------------------------------------------------------
         v_time = time.time()
 
@@ -206,6 +196,7 @@ class VLObjectNav_Agent(ObjectNav_Agent):
         self.relative_angle = round(np.arctan2(camera_matrix_T[2][0], camera_matrix_T[0][0])* 57.29577951308232 + 180)
         # print("self.relative_angle: ", self.relative_angle)
 
+        # TODO 这里可能会去掉一些目标detection, 但是每个目标里存了它字自己的id
         fg_detection_list, bg_detection_list = gobs_to_detection_list(
             cfg = self.cfg,
             image = image_rgb,
@@ -222,15 +213,14 @@ class VLObjectNav_Agent(ObjectNav_Agent):
         # print('build objects: %.3f秒'%objv_time)
         time_step_info += 'build objects time:%.3fs\n'%(objv_time)
 
+
         if len(fg_detection_list) > 0 and len(self.objects) > 0 :
             spatial_sim = compute_spatial_similarities(self.cfg, fg_detection_list, self.objects)
             visual_sim = compute_visual_similarities(self.cfg, fg_detection_list, self.objects)
             agg_sim = aggregate_similarities(self.cfg, spatial_sim, visual_sim)
-
             # Threshold sims according to cfg. Set to negative infinity if below threshold
             agg_sim[agg_sim < self.cfg.sim_threshold] = float('-inf')
-
-            self.objects = merge_detections_to_objects(self.cfg, fg_detection_list, self.objects, agg_sim)
+            self.objects, detection_to_object = merge_detections_to_objects(self.cfg, fg_detection_list, self.objects, agg_sim)
 
         # Perform post-processing periodically if told so
         if cfg.denoise_interval > 0 and (self.l_step+1) % cfg.denoise_interval == 0:
@@ -247,13 +237,13 @@ class VLObjectNav_Agent(ObjectNav_Agent):
 
         if len(self.objects) == 0:
             # Add all detections to the map
+            detection_to_object = {}
             for i in range(len(fg_detection_list)):
                 self.objects.append(fg_detection_list[i])
+                detection_to_object[fg_detection_list[i]["mask_idx"][0]] = len(self.objects)-1
 
         # ------------------------------------------------------------------
-
-        # ------------------------------------------------------------------
-        ##### 2D Obstacle Map
+        ##### 4. 2D Obstacle Map
         # ------------------------------------------------------------------
         f_map_time = time.time()
 
@@ -319,6 +309,9 @@ class VLObjectNav_Agent(ObjectNav_Agent):
         similarity_threshold = 0.29
         similarities = None
 
+        #  ----------------------------------------
+        # 5. 进行grounding
+        # -----------------------------------------
         '''
         grounding的部分:
         首先根据相似度去grounding 3D target objects
@@ -431,10 +424,32 @@ class VLObjectNav_Agent(ObjectNav_Agent):
                     self.similarity_obj_map[self.object_map_building(self.objects[i]['pcd'])] = similarities[i]  
 
         # 应该以一定的频率执行
-        if True:
+        if False:
             # 已经得到了result image 对VLM进行提问
-            self.ask_VLM(result_image)
+            answer = self.ask_VLM(result_image)
+            '''
+            函数会返回object的index, 或者是两种失败情况, 现在就考虑简单一点, 
+            当返回了object的id, 就直接走过去
+            若没有找到object, 则选择frontier
+            '''
+            if answer == "false_1":
+                print("false_1")
+            elif answer == "false_2":
+                print("false_2")
+            else:
+                index = int(answer.split("_")[1])
+                print(f"index: {index}")
+        
+        if use_vlm:
+            # if len(fg_detection_list) != len(results["mask"]):
+            #     raise ValueError("fg lens != all detections")
 
+            # 遍历前景目标, 根据detection id 确定object id , 可视化object id check对不对
+            for i in range(len(fg_detection_list)):
+                object_index = detection_to_object[fg_detection_list[i]["mask_idx"][0]]
+                object_map = self.objects[object_index]
+                # o3d.visualization.draw_geometries([object_map["pcd"]])  # TODO 为什么这里的目标点云的颜色被改变了
+                print(1)
 
         # 4. img similarity map 构建
         image_clip_sim = cal_clip_sim(self.text_queries, current_image_feats, self.clip_model, self.clip_tokenizer)
@@ -570,7 +585,7 @@ class VLObjectNav_Agent(ObjectNav_Agent):
 
         vis_image = None
         if self.args.print_images or self.args.visualize:
-            self.annotated_image  = vis_result_fast(image, detections, self.classes)
+            self.annotated_image  = vis_result_fast(image, detections, self.classes, draw_bbox=True, draw_mask=False)
             vis_image = self._visualize(self.obstacle_map, self.explored_map, target_edge_map, self.goal_map)
 
         if len(self.objects) > 0:

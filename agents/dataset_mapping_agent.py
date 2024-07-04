@@ -666,7 +666,7 @@ class Mapping_Agent(Agent):
                 image_rgb, detections, self.clip_model, self.clip_preprocess, self.device)
             
             ### Visualize results ###
-            annotated_image = vis_result_fast(image, detections, self.classes)
+            annotated_image = vis_result_fast(image, detections, self.classes, draw_bbox=True, draw_mask=True)
             clip_e_time = time.time()
             # print('clip: %.3f秒'%(clip_e_time - clip_s_time)) 
 
