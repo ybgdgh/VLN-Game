@@ -113,7 +113,7 @@ def main(args, send_queue, receive_queue):
             agent_state = env.sim.get_agent_state()
 
             # 每10个step询问一次
-            use_vlm = count_steps % 10 == 0
+            use_vlm = count_steps % 50 == 0
             action = agent.act(obs, agent_state, use_vlm, send_queue, receive_queue)
 
             if action == None:

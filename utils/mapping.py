@@ -509,7 +509,8 @@ def gobs_to_detection_list(
     
     gobs = resize_gobs(gobs, image)
 
-    gobs = filter_gobs(cfg, gobs, image, BG_CLASSES)
+    # TODO 
+    # gobs = filter_gobs(cfg, gobs, image, BG_CLASSES)
     
     if len(gobs['xyxy']) == 0:
         return fg_detection_list, bg_detection_list
@@ -536,8 +537,8 @@ def gobs_to_detection_list(
         )
         
         # It at least contains 5 points
-        if len(camera_object_pcd.points) < max(cfg.min_points_threshold, 5): 
-            continue
+        # if len(camera_object_pcd.points) < max(cfg.min_points_threshold, 5): 
+        #     continue
         
         if trans_pose is not None:
             global_object_pcd = camera_object_pcd.transform(trans_pose)
@@ -550,8 +551,8 @@ def gobs_to_detection_list(
         pcd_bbox = get_bounding_box(cfg, global_object_pcd)
         pcd_bbox.color = [0,1,0]
         
-        if pcd_bbox.volume() < 1e-6:
-            continue
+        # if pcd_bbox.volume() < 1e-6:
+        #     continue
         
         # Treat the detection in the same way as a 3D object
         # Store information that is enough to recover the detection

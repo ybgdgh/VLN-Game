@@ -22,6 +22,7 @@ import base64
 import os
 from PIL import Image
 import requests
+import io
 
 # OpenAI API Key
 api_key = os.getenv("OPENAI_API_KEY")
@@ -78,7 +79,7 @@ def ask_VLM(result_image=None, instruction=None):
         "/home/rickyyzliu/workspace/embodied-AI/habitat/detect.jpg"
     )
 
-    import io
+    
 
     # pil_image = Image.fromarray(np.uint8(result_image))
     # pil_image.show()

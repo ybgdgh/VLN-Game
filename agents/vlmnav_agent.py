@@ -5,6 +5,9 @@ import requests
 import math
 import time
 import os
+import io
+
+from PIL import Image
 
 import torch
 import open3d as o3d
@@ -81,11 +84,13 @@ class VLMNav_Agent(ObjectNav_Agent):
         self.candidate_objects = []
         self.chat_history_for_llm = []
         self.candidate_id = []
+        self.objects = MapObjectList()
 
     def reset(self) -> None:
         super().reset()
         self.candidate_num = 0
         self.candidate_objects = []
+        self.objects = MapObjectList()
 
     def act(
         self,
@@ -106,7 +111,7 @@ class VLMNav_Agent(ObjectNav_Agent):
             )
 
             self.text_queries = observations["instruction"]["text"]  # 得到instruction
-            self.text_queries = "table."  # debug 用
+            self.text_queries = "white bed."  # debug 用
 
             self.all_objects = []
             self.landmark_data = []
@@ -128,7 +133,7 @@ class VLMNav_Agent(ObjectNav_Agent):
         # dino检测需要提前设置类别
         if self.args.detector == "dino":
             self.classes = self.all_objects
-        get_results, detections, result_image = self.obj_det_seg.detect(
+        get_results, detections, segemented_image = self.obj_det_seg.detect(
             image, image_rgb, self.classes
         )
         image_crops, image_feats, current_image_feats = compute_clip_features(
@@ -169,33 +174,16 @@ class VLMNav_Agent(ObjectNav_Agent):
             trans_pose=camera_matrix_T,
             class_names=self.classes,
         )
-        # 1) 如果当前map里已存在object, 进行merge
-        if len(fg_detection_list) > 0 and len(self.objects) > 0:
-            spatial_sim = compute_spatial_similarities(
-                self.cfg, fg_detection_list, self.objects
-            )
-            visual_sim = compute_visual_similarities(
-                self.cfg, fg_detection_list, self.objects
-            )
-            agg_sim = aggregate_similarities(self.cfg, spatial_sim, visual_sim)
-            # Threshold sims according to cfg. Set to negative infinity if below threshold
-            agg_sim[agg_sim < self.cfg.sim_threshold] = float("-inf")
-            self.objects, detection_to_object = merge_detections_to_objects(
-                self.cfg, fg_detection_list, self.objects, agg_sim
-            )
-        # 后处理
-        if cfg.denoise_interval > 0 and (self.l_step + 1) % cfg.denoise_interval == 0:
-            self.objects = denoise_objects(cfg, self.objects)
-        if cfg.merge_interval > 0 and (self.l_step + 1) % cfg.merge_interval == 0:
-            self.objects = merge_objects(cfg, self.objects)
-        if cfg.filter_interval > 0 and (self.l_step + 1) % cfg.filter_interval == 0:
-            self.objects = filter_objects(cfg, self.objects)
-        # 2) 如果当前map为空, 直接加入detections
-        if len(self.objects) == 0:
-            detection_to_object = {}
-            for i in range(len(fg_detection_list)):
-                self.objects.append(fg_detection_list[i])
-                detection_to_object[fg_detection_list[i]["mask_idx"][0]] = (len(self.objects) - 1)
+
+        # TODO 有一种情况是可能fg_detection_list 可能为空
+        detection_to_object = {}
+        self.objects = MapObjectList()
+        for i in range(len(fg_detection_list)):
+            self.objects.append(fg_detection_list[i])
+            detection_to_object[fg_detection_list[i]["mask_idx"][0]] = len(self.objects)-1
+
+        if results != None and use_vlm:    
+            print(f"total num: {len(detections)}, fg num: {len(self.objects)}")
 
         # ------------------------------------------------------------------
         ##### 4. 2D Obstacle Map
@@ -281,8 +269,9 @@ class VLMNav_Agent(ObjectNav_Agent):
         if len(self.candidate_objects) == 0:
             if use_vlm:
                 # 已经得到了result image 对VLM进行提问
-                # answer = self.ask_VLM(result_image)
-                answer = "false_1"
+                answer = self.ask_VLM(image, segemented_image, self.text_queries)
+                # answer = "false_1"
+
                 """
                 函数会返回object的index, 或者是两种失败情况, 现在就考虑简单一点, 
                 当返回了object的id, 就直接走过去
@@ -290,12 +279,12 @@ class VLMNav_Agent(ObjectNav_Agent):
                 """
                 if answer == "false_1":
                     print("false_1")
-                elif answer == "false_2":
+                elif answer == "false_2":  # 完全没有这个目标
                     print("false_2")
                 else:
                     index = int(answer.split("_")[1])
-                    print(f"index: {index}")
-                    self.candidate_id = detection_to_object[index]
+                    print(f"!!!!!!!!!!  found object  !!!!!!!!!!!!!!!!!!! : {index}")
+                    self.candidate_id.append(detection_to_object[index])
                     self.candidate_objects = [self.objects[self.candidate_id[0]]]
             
         # ------------------------------------------------------------------
@@ -542,45 +531,26 @@ class VLMNav_Agent(ObjectNav_Agent):
         else:
             return None
 
-    def ask_VLM(result_image, instruction):
+    def ask_VLM(self, raw_image, segemented_image, instruction):
 
-        instruction = "The table on the left side of the sofa."
+        # instruction = "Table."
+        # pil_image = Image.open("/home/rickyyzliu/workspace/embodied-AI/habitat/raw_img.jpg")
+        # pil_segmented_image = Image.open("/home/rickyyzliu/workspace/embodied-AI/habitat/detect.jpg")
 
-        import io
-
-        pil_image = Image.fromarray(np.uint8(result_image))
-        # pil_image.show()
+        pil_image = Image.fromarray(np.uint8(raw_image))
+        pil_segmented_image = Image.fromarray(np.uint8(segemented_image))
 
         buffered = io.BytesIO()
         pil_image.save(buffered, format="JPEG")
-
         img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
+
+        segmented_buffered = io.BytesIO()
+        pil_segmented_image.save(segmented_buffered, format="JPEG")
+        segmented_img_str = base64.b64encode(segmented_buffered.getvalue()).decode("utf-8")
 
         api_key = os.getenv("OPENAI_API_KEY")
 
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {api_key}",
-        }
-
-        # payload = {
-        #     "model": "gpt-4o",  # gpt-4o gpt-4-vision-preview
-        #     "messages": [
-        #         {
-        #             "role": "user",
-        #             "content": [
-        #                 {"type": "text", "text": "What's in this image?"},
-        #                 {
-        #                     "type": "image_url",
-        #                     "image_url": {
-        #                         "url": f"data:image/jpeg;base64,{img_str}"
-        #                     },
-        #                 },
-        #             ],
-        #         }
-        #     ],
-        #     "max_tokens": 8,  # 300
-        # }
+        headers = {"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"}
 
         payload = {
             "model": "gpt-4o",  # gpt-4o gpt-4-vision-preview
@@ -590,20 +560,26 @@ class VLMNav_Agent(ObjectNav_Agent):
                     "content": [
                         {
                             "type": "text",
-                            "text": f"Instruction: {instruction}. Here is an image:",
+                            "text": f"Instruction: {instruction}. Here are two images. The first image shows what the robot sees, and the second image shows object segmentation annotations.",
                         },
                         {
                             "type": "image_url",
                             "image_url": {"url": f"data:image/jpeg;base64,{img_str}"},
                         },
                         {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{segmented_img_str}"
+                            },
+                        },
+                        {
                             "type": "text",
-                            "text": "Which obj_i in the image corresponds to the object described in the instruction and why?",
+                            "text": "Please identify the obj_i in the images that corresponds to the target object described in the instruction and provide a reason. Please respond in the format: 'Answer: obj_i, Reason: ...'. Note: 1. If the target object is in the image but not marked by a bounding box, respond with 'Answer: false_1, Reason: object hear, bbox not hear'. 2. If the target object is not in the image at all, respond with 'Answer: false_2, Reason: object not hear'.",
                         },
                     ],
                 }
             ],
-            "max_tokens": 20,  # 修改为适当的值
+            "max_tokens": 9,  # 修改为适当的值
         }
 
         response = requests.post(
@@ -612,4 +588,9 @@ class VLMNav_Agent(ObjectNav_Agent):
             json=payload,
         )
 
-        print(response.json())
+        answer = response.json()["choices"][0]["message"]["content"]
+        answer_parts = answer.split(", Reason: ")
+        obj_i = answer_parts[0].split(": ")[1]
+        reason = answer_parts[1]
+
+        return obj_i
