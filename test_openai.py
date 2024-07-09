@@ -222,7 +222,7 @@ def ask_VLM_patch(result_image=None, instruction=None):
         f"Here are two images. "
         "The first image shows what the robot sees, and the second image shows that this image is divided into n*m patches. "
         "Your task is to identify the patch in the second image that "
-        "main contains the target object described in the instruction. If you find the target object, "
+        "corresponding to the target object described in the instruction. If you find the target object, "
         "please accurately provide the identifier of the patch. If the target object is not in the image, "
         "suggest the most promising patch where further exploration is likely to reveal the target object. "
         "Please provide the output in JSON format, without any Markdown syntax, such as "

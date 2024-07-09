@@ -11,3 +11,4 @@ mobile_sam.pt
 yolov8l-world.pt
 test.py
 human_eval
+saved_pcd
