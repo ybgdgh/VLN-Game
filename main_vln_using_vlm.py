@@ -52,7 +52,7 @@ def main(args, send_queue, receive_queue):
         filename=log_dir + "eval.log",
         level=logging.INFO)
 
-    args.task_config = "vlobjectnav_hm3d.yaml"
+    args.task_config = "vlobjectnav_hm3d_v2_36.yaml"
     config = get_config(config_paths=["configs/"+ args.task_config])
 
     logging.info(args)

@@ -475,6 +475,7 @@ class VLObjectNav_Agent(ObjectNav_Agent):
         #     self.found_goal = False
 
         if not self.found_goal:
+            
             stg = None
             if np.sum(self.goal_map) == 1:
                 f_pos = np.argwhere(self.goal_map == 1)

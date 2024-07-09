@@ -193,6 +193,7 @@ class Object_Detection_and_Segmentation():
                 detections.confidence = detections.confidence[valid_idx]
                 detections.class_id = detections.class_id[valid_idx]
                 
+                # TODO 这里才进行segementation
                 detections.mask = get_sam_segmentation_from_xyxy(
                     sam_predictor=self.sam_predictor,
                     image=image_rgb,

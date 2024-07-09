@@ -1,85 +1,19 @@
-# import os
-# import openai
-
-# openai.api_key = os.getenv("OPENAI_API_KEY")
-# print(openai.api_key )
-# openai.api_base = "https://gptproxy.llmpaas.woa.com/v1" #只增加这一行即可
-
-# response = openai.ChatCompletion.create(
-#     model="gpt-3.5-turbo",
-#     messages=[
-#         {"role": "system", "content": "You are a helpful assistant."},
-#         {"role": "user", "content": "Who won the world series in 2020?"},
-#         {"role": "assistant", "content": "The Los Angeles Dodgers won the World Series in 2020."},
-#         {"role": "user", "content": "Where was it played?"}
-#     ]
-# )
-
-# print(response)
-
-
 import base64
 import os
 from PIL import Image
 import requests
 import io
+import json
+from PIL import Image, ImageDraw, ImageFont
 
 # OpenAI API Key
 api_key = os.getenv("OPENAI_API_KEY")
 
-
-# Function to encode the image
-# def encode_image(image_path):
-#     with open(image_path, "rb") as image_file:
-#         return base64.b64encode(image_file.read()).decode("utf-8")
-
-
-# # Path to your image
-# image_path = "/home/rickyyzliu/workspace/embodied-AI/habitat/2.jpeg"
-
-# # Getting the base64 string
-# base64_image = encode_image(image_path)
-
-# headers = {"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"}
-
-# payload = {
-#     "model": "gpt-4o", # gpt-4o gpt-4-vision-preview
-#     "messages": [
-#         {
-#             "role": "user",
-#             "content": [
-#                 {"type": "text", "text": "What's in this image?"},
-#                 {
-#                     "type": "image_url",
-#                     "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"},
-#                 },
-#             ],
-#         }
-#     ],
-#     "max_tokens": 8,  # 300
-# }
-
-# response = requests.post(
-#     "https://gptproxy.llmpaas.woa.com/v1/chat/completions",
-#     headers=headers,
-#     json=payload,
-# )
-
-# print(response.json())
-
-
 def ask_VLM(result_image=None, instruction=None):
-
-    # instruction = "A standing man wearing blue clothes."
-    # instruction = "The pillow on the sofa."
-    instruction = "Table."
-
-    pil_image = Image.open("/home/rickyyzliu/workspace/embodied-AI/habitat/raw_img.jpg")
+    pil_image = Image.open("/home/rickyyzliu/workspace/embodied-AI/habitat/2.jpeg")
     pil_segmented_image = Image.open(
-        "/home/rickyyzliu/workspace/embodied-AI/habitat/detect.jpg"
+        "/home/rickyyzliu/workspace/embodied-AI/habitat/output_image.jpg"
     )
-
-    
 
     # pil_image = Image.fromarray(np.uint8(result_image))
     # pil_image.show()
@@ -96,64 +30,25 @@ def ask_VLM(result_image=None, instruction=None):
 
     headers = {"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"}
 
-    # payload = {
-    #     "model": "gpt-4o",  # gpt-4o gpt-4-vision-preview
-    #     "messages": [
-    #         {
-    #             "role": "user",
-    #             "content": [
-    #                 {"type": "text", "text": "What's in this image?"},
-    #                 {
-    #                     "type": "image_url",
-    #                     "image_url": {
-    #                         "url": f"data:image/jpeg;base64,{img_str}"
-    #                     },
-    #                 },
-    #             ],
-    #         }
-    #     ],
-    #     "max_tokens": 8,  # 300
-    # }
 
-    # payload = {
-    #     "model": "gpt-4o",  # gpt-4o gpt-4-vision-preview
-    #     "messages": [
-    #         {
-    #             "role": "user",
-    #             "content": [
-    #                 {"type": "text", "text": f"Instruction: {instruction}. Here is an image:"},
-    #                 {
-    #                     "type": "image_url",
-    #                     "image_url": {
-    #                         "url": f"data:image/jpeg;base64,{img_str}"
-    #                     },
-    #                 },
-    #                 {"type": "text", "text": "Please identify the obj_i in the image that corresponds to the object described in the instruction and provide a reason. Please respond in the format: 'Answer: obj_i, Reason: ...'."}
-    #             ],
-    #         }
-    #     ],
-    #     "max_tokens": 20,  # 修改为适当的值
-    # }
-
-    # payload = {
-    #     "model": "gpt-4o",  # gpt-4o gpt-4-vision-preview
-    #     "messages": [
-    #         {
-    #             "role": "user",
-    #             "content": [
-    #                 {"type": "text", "text": f"Instruction: {instruction}. Here is an image:"},
-    #                 {
-    #                     "type": "image_url",
-    #                     "image_url": {
-    #                         "url": f"data:image/jpeg;base64,{img_str}"
-    #                     },
-    #                 },
-    #                 {"type": "text", "text": "Please identify the obj_i in the image that corresponds to the target object described in the instruction and provide a reason. If the target object is in the image but not marked by a bounding box, respond with 'Answer: false_1, Reason: object hear, bbox not hear'. If the target object is not in the image at all, respond with 'Answer: false_2, Reason: object not hear'. Otherwise, respond in the format: 'Answer: obj_i, Reason: ...'."}
-    #             ],
-    #         }
-    #     ],
-    #     "max_tokens": 20,  # 修改为适当的值
-    # }
+    # instruction = "A standing man wearing blue clothes."
+    instruction = "The pillow on the sofa."
+    # instruction = "The table in front of the sofa."
+    # instruction = "The side table near the sofa."
+    # instruction = "Table."
+    # instruction = "Desk."
+    text = (
+        f"Here are two images. "
+        "The first image shows what the robot sees, and the second image shows object segmentation annotations. "
+        "Based on this information, please identify the object in the second image that corresponds to the target object "
+        "described in the instruction and provide a reason. "
+        "Please respond in the format: 'Answer: obj_i. Reason: ...'. "
+        "Note: Use object IDs('obj_#') to describe the objects in the image instead of their actual names. "
+        "If the target object is in the image but not marked by a bounding box, "
+        "respond with 'Answer: false_1. Reason: ...'. If the "
+        "target object is not in the image at all, respond with 'Answer: false_2, Reason: ... "
+        f"Instruction: {instruction}."
+    )
 
     payload = {
         "model": "gpt-4o",  # gpt-4o gpt-4-vision-preview
@@ -161,10 +56,6 @@ def ask_VLM(result_image=None, instruction=None):
             {
                 "role": "user",
                 "content": [
-                    {
-                        "type": "text",
-                        "text": f"Instruction: {instruction}. Here are two images. The first image shows what the robot sees, and the second image shows object segmentation annotations.",
-                    },
                     {
                         "type": "image_url",
                         "image_url": {"url": f"data:image/jpeg;base64,{img_str}"},
@@ -177,12 +68,12 @@ def ask_VLM(result_image=None, instruction=None):
                     },
                     {
                         "type": "text",
-                        "text": "Please identify the obj_i in the images that corresponds to the target object described in the instruction and provide a reason. Please respond in the format: 'Answer: obj_i, Reason: ...'. Note: 1. If the target object is in the image but not marked by a bounding box, respond with 'Answer: false_1, Reason: object hear, bbox not hear'. 2. If the target object is not in the image at all, respond with 'Answer: false_2, Reason: object not hear'.",
+                        "text": text,
                     },
                 ],
             }
         ],
-        "max_tokens": 20,  # 修改为适当的值
+        "max_tokens": 100,  # 修改为适当的值
     }
 
     response = requests.post(
@@ -192,7 +83,8 @@ def ask_VLM(result_image=None, instruction=None):
     )
 
     answer = response.json()["choices"][0]["message"]["content"]
-    answer_parts = answer.split(", Reason: ")
+    print(f"{answer}")
+    answer_parts = answer.split(". Reason: ")
     obj_i = answer_parts[0].split(": ")[1]
     reason = answer_parts[1]
 
@@ -210,60 +102,171 @@ def ask_VLM(result_image=None, instruction=None):
     return obj_i
 
 
-if __name__ == "__main__":
-    ask_VLM()
+def ask_VLM_coord(result_image=None, instruction=None):
+    pil_image = Image.open("/home/rickyyzliu/workspace/embodied-AI/habitat/2.jpeg")
 
-    # {
-    #     "choices": [
-    #         {
-    #             "content_filter_results": {
-    #                 "hate": {"filtered": False, "severity": "safe"},
-    #                 "self_harm": {"filtered": False, "severity": "safe"},
-    #                 "sexual": {"filtered": False, "severity": "safe"},
-    #                 "violence": {"filtered": False, "severity": "safe"},
-    #             },
-    #             "finish_reason": "stop",
-    #             "index": 0,
-    #             "logprobs": None,
-    #             "message": {
-    #                 "content": "Answer: false_1, Reason: object here, bbox not here.",
-    #                 "role": "assistant",
-    #             },
-    #         }
-    #     ],
-    #     "created": 1719973845,
-    #     "id": "chatcmpl-9gk3ZS0f00s87ATYWoeO2EOrGSfVC",
-    #     "model": "gpt-4o-2024-05-13",
-    #     "object": "chat.completion",
-    #     "prompt_filter_results": [
-    #         {
-    #             "prompt_index": 0,
-    #             "content_filter_result": {
-    #                 "jailbreak": {"filtered": False, "detected": False},
-    #                 "custom_blocklists": {"filtered": False, "details": []},
-    #             },
-    #         },
-    #         {
-    #             "prompt_index": 2,
-    #             "content_filter_result": {
-    #                 "sexual": {"filtered": False, "severity": "safe"},
-    #                 "violence": {"filtered": False, "severity": "safe"},
-    #                 "hate": {"filtered": False, "severity": "safe"},
-    #                 "self_harm": {"filtered": False, "severity": "safe"},
-    #                 "custom_blocklists": {"filtered": False, "details": []},
-    #             },
-    #         },
-    #         {
-    #             "prompt_index": 1,
-    #             "content_filter_result": {
-    #                 "sexual": {"filtered": False, "severity": "safe"},
-    #                 "violence": {"filtered": False, "severity": "safe"},
-    #                 "hate": {"filtered": False, "severity": "safe"},
-    #                 "self_harm": {"filtered": False, "severity": "safe"},
-    #                 "custom_blocklists": {"filtered": False, "details": []},
-    #             },
-    #         },
-    #     ],
-    #     "system_fingerprint": "fp_36b0c83da2",
-    #     "usage": {"completion_tokens": 15, "prompt_tokens": 844, "total_tokens": 859},
-    # }
+    buffered = io.BytesIO()
+    pil_image.save(buffered, format="JPEG")
+    img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
+
+
+    api_key = os.getenv("OPENAI_API_KEY")
+
+    headers = {"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"}
+
+    # instruction = "A standing man wearing blue clothes."
+    # instruction = "The pillow on the sofa."
+    instruction = "The table in front of the sofa."
+    # instruction = "The side table near the sofa."
+    # instruction = "Table."
+    # instruction = "Desk."
+    image_size = pil_image.size
+    print(image_size)
+    text = (
+        "Assume you are the navigation unit of a robot. The image shows what the robot sees. "
+        "Your task is to identify the object in the image that corresponds to the target object described in the instruction. "
+        "If you find the target object in the image, please accurately provide its coordinates (x, y) in the image, representing the center of the object. "
+        f"Note: The coordinates of the image top left corner is (0, 0), and the image size (width, height) is {image_size}. "
+        "Please ensure the accuracy of the coordinates and provide the output in JSON format, without any Markdown syntax, such as "
+        '{"found_object": "True", "object_coordinate": ..., "reason": ...}'
+        f"\n\nInstruction: {instruction}"
+    )
+    payload = {
+        "model": "gpt-4o",  # gpt-4o gpt-4-vision-preview
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/jpeg;base64,{img_str}"},
+                    },
+                    {
+                        "type": "text",
+                        "text": text,
+                    },
+                ],
+            }
+        ],
+        "max_tokens": 100,  # 修改为适当的值
+    }
+
+    response = requests.post(
+        "https://gptproxy.llmpaas.woa.com/v1/chat/completions",
+        headers=headers,
+        json=payload,
+    )
+
+    answer = response.json()["choices"][0]["message"]["content"]
+    print(f"{answer}")
+
+    # 解析 JSON
+    output_dict = json.loads(answer)
+    found_object = output_dict["found_object"]
+    object_coordinate = tuple(output_dict["object_coordinate"])
+    reason = output_dict["reason"]
+    # 输出解析结果
+    print(f"Found object: {found_object}")
+    print(f"Object coordinate: {object_coordinate}")
+    print(f"Reason: {reason}")
+
+    # 在图像上绘制坐标
+    if found_object == "True":
+        draw = ImageDraw.Draw(pil_image)
+        radius = 10
+        x, y = object_coordinate
+        draw.ellipse((x - radius, y - radius, x + radius, y + radius), fill=(255, 0, 0))
+
+    pil_image.show()
+
+    print("finished!")
+
+def ask_VLM_patch(result_image=None, instruction=None):
+    pil_image = Image.open("/home/rickyyzliu/workspace/embodied-AI/habitat/2.jpeg")
+    n, m = 8, 8
+    width, height = pil_image.size
+    patch_width, patch_height = width // n, height // m
+
+    numbered_image = pil_image.copy()
+    draw = ImageDraw.Draw(numbered_image)
+    font = ImageFont.load_default()
+
+    for i in range(n):
+        for j in range(m):
+            patch_id = f"{i+1}-{j+1}"
+            x, y = i * patch_width, j * patch_height
+            draw.rectangle([(x, y), (x + patch_width, y + patch_height)], outline="white", width=1)
+            draw.text((x + patch_width // 2, y + patch_height // 2), patch_id, font=font, fill="white", anchor="mm")
+
+    buffered = io.BytesIO()
+    pil_image.save(buffered, format="JPEG")
+    img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
+
+    segmented_buffered = io.BytesIO()
+    numbered_image.save(segmented_buffered, format="JPEG")
+    segmented_img_str = base64.b64encode(segmented_buffered.getvalue()).decode("utf-8")
+
+    api_key = os.getenv("OPENAI_API_KEY")
+    headers = {"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"}
+
+
+    # instruction = "The pillow on the sofa."
+    # instruction = "A standing man wearing blue clothes."
+    # instruction = "chair."
+    # instruction = "The pillow on the sofa."
+    # instruction = "The table in front of the sofa."
+    instruction = "The side table behind the sofa."
+    # instruction = "Table."
+    # instruction = "Desk."
+    text = (
+        f"Here are two images. "
+        "The first image shows what the robot sees, and the second image shows that this image is divided into n*m patches. "
+        "Your task is to identify the patch in the second image that "
+        "main contains the target object described in the instruction. If you find the target object, "
+        "please accurately provide the identifier of the patch. If the target object is not in the image, "
+        "suggest the most promising patch where further exploration is likely to reveal the target object. "
+        "Please provide the output in JSON format, without any Markdown syntax, such as "
+        '{"found_object": "True", "patch_id": "i-j", "reason": ...} or '
+        '{"found_object": "False", "explore_patch_id": "i-j", "reason": ...}.'
+        f"\n\nInstruction: {instruction}"
+    )
+
+    payload = {
+        "model": "gpt-4o",  # gpt-4o gpt-4-vision-preview
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/jpeg;base64,{img_str}"},
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/jpeg;base64,{segmented_img_str}"
+                        },
+                    },
+                    {
+                        "type": "text",
+                        "text": text,
+                    },
+                ],
+            }
+        ],
+        "max_tokens": 100,  # 修改为适当的值
+    }
+
+    response = requests.post(
+        "https://gptproxy.llmpaas.woa.com/v1/chat/completions",
+        headers=headers,
+        json=payload,
+    )
+
+    answer = response.json()["choices"][0]["message"]["content"]
+    print(f"{answer}")
+    numbered_image.show(title="Numbered Image")
+
+if __name__ == "__main__":
+    ask_VLM_patch()
+

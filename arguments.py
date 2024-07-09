@@ -26,7 +26,7 @@ def get_args():
                                 (default: 0)""")
     parser.add_argument('--print_images', type=int, default=0,
                         help='1: save visualization as images')
-    parser.add_argument('--save_video', type=int, default=0,
+    parser.add_argument('--save_video', type=int, default=1,
                         help='1: save visualization as video')
     parser.add_argument('-n', '--num_processes', type=int, default=1)
     parser.add_argument('--rank', type=int, default=0)
@@ -38,7 +38,7 @@ def get_args():
     
     # Environment, dataset and episode specifications
     parser.add_argument("--task_config", type=str,
-                        default="objectnav_hm3d.yaml",
+                        default="vlobjectnav_hm3d_v2_36sdssadsa.yaml",
                         help="path to config yaml containing task information")
     parser.add_argument("--split", type=str, default="val",
                         help="dataset split (train | val_seen | val_unseen) ")
@@ -69,8 +69,8 @@ def get_args():
 
 
     # SAM setting
-    parser.add_argument("--box_threshold", type=float, default=0.3)
-    parser.add_argument("--text_threshold", type=float, default=0.25)
+    parser.add_argument("--box_threshold", type=float, default=0.7)  # 0.3
+    parser.add_argument("--text_threshold", type=float, default=0.8)  # 0.25
     parser.add_argument("--nms_threshold", type=float, default=0.5)
 
     parser.add_argument("--sam_variant", type=str, default="mobilesam",

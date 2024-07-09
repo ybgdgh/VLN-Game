@@ -111,7 +111,19 @@ class VLMNav_Agent(ObjectNav_Agent):
             )
 
             self.text_queries = observations["instruction"]["text"]  # 得到instruction
-            self.text_queries = "white bed."  # debug 用
+            self.text_queries = "chair."
+
+            # 用LLM做一个拆分
+            # self.chat_history_for_llm = []
+            # self.chat_history_for_llm.append({"role": "system", "content": Instruction_system_prompt})
+            # self.chat_history_for_llm.append({"role": "user", "content": self.text_queries})
+            # response_message = chat_with_gpt(self.chat_history_for_llm, 2)
+            # self.chat_history_for_llm.append({"role": "assistant", "content": response_message})
+            # generated_text = ast.literal_eval(response_message)
+            # ground_json = generated_text["command"]["args"]["ground_json"]
+            # self.target_data = ground_json["target"]["phrase"]
+            # print("target_data: ", self.target_data)
+            # self.text_queries = "flower"  # debug 用
 
             self.all_objects = []
             self.landmark_data = []
@@ -269,8 +281,8 @@ class VLMNav_Agent(ObjectNav_Agent):
         if len(self.candidate_objects) == 0:
             if use_vlm:
                 # 已经得到了result image 对VLM进行提问
-                answer = self.ask_VLM(image, segemented_image, self.text_queries)
-                # answer = "false_1"
+                # answer = self.ask_VLM(image, segemented_image, self.text_queries)
+                answer = "false_1"
 
                 """
                 函数会返回object的index, 或者是两种失败情况, 现在就考虑简单一点, 
@@ -298,11 +310,18 @@ class VLMNav_Agent(ObjectNav_Agent):
             self.nearest_point = self.find_nearest_point_cloud(self.candidate_objects[0]["pcd"], camera_position)
             self.found_goal = True
             print("found goal!")
+
+
+        '''
+        goal_map为0 代表上次没有发现目标
+        goal_map为1 代表
+        
+        '''
         # 如果没有找到目标
         if not self.found_goal:  
             # TODO ? 如果只有一个点, 直接把位置发给stg 为什么这种情况
             stg = None
-            if np.sum(self.goal_map) == 1:
+            if np.sum(self.goal_map) == 1: # 上一次选的是边界, 记录上一次边界位置
                 f_pos = np.argwhere(self.goal_map == 1)
                 stg = f_pos[0]
 
@@ -335,23 +354,24 @@ class VLMNav_Agent(ObjectNav_Agent):
                 # TODO ?
                 if (
                     np.array_equal(stg, target_point_list[global_item])
-                    and target_score[global_item] < 30
+                    and target_score[global_item] < 30  # 自己和边界的举例
                 ):
-                    self.curr_frontier_count += 1
+                    self.curr_frontier_count += 1  # 记录这个边界被选了几次, 应对卡住的情况
                 else:
-                    self.curr_frontier_count = 0
+                    self.curr_frontier_count = 0  # 
                 # TODO ?
                 if (
-                    self.curr_frontier_count > 20
-                    or self.replan_count > 20
-                    or self.greedy_stop_count > 20
+                    self.curr_frontier_count > 20  # 
+                    or self.replan_count > 20  # 规划不过去
+                    or self.greedy_stop_count > 20  # 
                 ):
-                    self.obstacle_map[target_edge_map == global_item + 1] = 1
+                    self.obstacle_map[target_edge_map == global_item + 1] = 1  # 把那条边界在障碍物地图设为1
                     self.curr_frontier_count = 0
                     self.replan_count = 0
                     self.greedy_stop_count = 0
 
                 self.goal_map[target_point_list[global_item][0], target_point_list[global_item][1]] = 1
+
             # TODO 这里还删除了一种情况, elif len(self.objects) > 0 and self.l_step > 200:
             # 如果没有边界存在, 就随机选取 
             else:
@@ -360,13 +380,13 @@ class VLMNav_Agent(ObjectNav_Agent):
                 self.goal_map[goal_pose_x, goal_pose_y] = 1
 
         # TODO goal 0 1 >1 意味着什么 
-        if np.sum(self.goal_map) == 1:
+        if np.sum(self.goal_map) == 1:  # 选的边界 
             f_pos = np.argwhere(self.goal_map == 1)
             stg = f_pos[0]
             x = (stg[0] - int(self.origins_grid[0])) * self.args.map_resolution / 100.0
             y = camera_position[1]
             z = (stg[1] - int(self.origins_grid[1])) * self.args.map_resolution / 100.0
-        elif np.sum(self.goal_map) == 0:
+        elif np.sum(self.goal_map) == 0:  # TODO ? 可以
             self.found_goal == False
             goal_pose_x = int(np.random.rand() * self.map_size)
             goal_pose_y = int(np.random.rand() * self.map_size)
@@ -376,7 +396,7 @@ class VLMNav_Agent(ObjectNav_Agent):
             x = (stg[0] - int(self.origins_grid[0])) * self.args.map_resolution / 100.0
             y = camera_position[1]
             z = (stg[1] - int(self.origins_grid[1])) * self.args.map_resolution / 100.0
-        else:  # > 1
+        else:  # > 1 找到目标
             x = self.nearest_point[0]
             y = self.nearest_point[1]
             z = self.nearest_point[2]
@@ -532,11 +552,6 @@ class VLMNav_Agent(ObjectNav_Agent):
             return None
 
     def ask_VLM(self, raw_image, segemented_image, instruction):
-
-        # instruction = "Table."
-        # pil_image = Image.open("/home/rickyyzliu/workspace/embodied-AI/habitat/raw_img.jpg")
-        # pil_segmented_image = Image.open("/home/rickyyzliu/workspace/embodied-AI/habitat/detect.jpg")
-
         pil_image = Image.fromarray(np.uint8(raw_image))
         pil_segmented_image = Image.fromarray(np.uint8(segemented_image))
 
@@ -552,16 +567,25 @@ class VLMNav_Agent(ObjectNav_Agent):
 
         headers = {"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"}
 
+        text = (
+            f"Here are two images. "
+            "The first image shows what the robot sees, and the second image shows object segmentation annotations. "
+            "Based on this information, please identify the object in the second image that corresponds to the target object "
+            "described in the instruction and provide a reason. "
+            "Please respond in the format: 'Answer: obj_i. Reason: ...'. "
+            "Note: Use object IDs('obj_#') to describe the objects in the image instead of their actual names. "
+            "If the target object is in the image but not marked by a bounding box, "
+            "respond with 'Answer: false_1. Reason: ...'. If the "
+            "target object is not in the image at all, respond with 'Answer: false_2, Reason: ... "
+            f"Instruction: {instruction}."
+        )
+
         payload = {
             "model": "gpt-4o",  # gpt-4o gpt-4-vision-preview
             "messages": [
                 {
                     "role": "user",
                     "content": [
-                        {
-                            "type": "text",
-                            "text": f"Instruction: {instruction}. Here are two images. The first image shows what the robot sees, and the second image shows object segmentation annotations.",
-                        },
                         {
                             "type": "image_url",
                             "image_url": {"url": f"data:image/jpeg;base64,{img_str}"},
@@ -574,12 +598,12 @@ class VLMNav_Agent(ObjectNav_Agent):
                         },
                         {
                             "type": "text",
-                            "text": "Please identify the obj_i in the images that corresponds to the target object described in the instruction and provide a reason. Please respond in the format: 'Answer: obj_i, Reason: ...'. Note: 1. If the target object is in the image but not marked by a bounding box, respond with 'Answer: false_1, Reason: object hear, bbox not hear'. 2. If the target object is not in the image at all, respond with 'Answer: false_2, Reason: object not hear'.",
+                            "text": text,
                         },
                     ],
                 }
             ],
-            "max_tokens": 9,  # 修改为适当的值
+            "max_tokens": 100,  # 修改为适当的值
         }
 
         response = requests.post(
@@ -592,5 +616,10 @@ class VLMNav_Agent(ObjectNav_Agent):
         answer_parts = answer.split(", Reason: ")
         obj_i = answer_parts[0].split(": ")[1]
         reason = answer_parts[1]
+        
+        print(answer)
 
         return obj_i
+
+
+    # def ask_qianwen
