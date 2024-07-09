@@ -1,9 +1,9 @@
-# import os
-# import openai
+import os
+import openai
 
-# openai.api_key = os.getenv("OPENAI_API_KEY")
+openai.api_key = os.getenv("OPENAI_API_KEY")
 # print(openai.api_key )
-# openai.api_base = "https://gptproxy.llmpaas.woa.com/v1" #只增加这一行即可
+openai.api_base = "https://gptproxy.llmpaas.woa.com/v1" #只增加这一行即可
 
 # response = openai.ChatCompletion.create(
 #     model="gpt-3.5-turbo",
@@ -23,8 +23,6 @@ import os
 from PIL import Image
 import requests
 
-# OpenAI API Key
-api_key = os.getenv("OPENAI_API_KEY")
 
 
 # Function to encode the image
@@ -71,10 +69,10 @@ def ask_VLM(result_image=None, instruction=None):
         
     # instruction = "A standing man wearing blue clothes."
     # instruction = "The pillow on the sofa."
-    instruction = "The table in front of the sofa."
+    instruction = "Please tell me how many elevators and their elevator ID, and mark the bounding box of the elevator door."
 
-    pil_image = Image.open("/home/rickyyzliu/workspace/embodied-AI/habitat/2.jpeg")
-    pil_segmented_image = Image.open("/home/rickyyzliu/workspace/embodied-AI/habitat/output_image.jpg")
+    pil_image = Image.open("/home/data/teaganli/test_image/IMG_8119.jpg")
+    pil_segmented_image = Image.open("/home/data/teaganli/test_image/IMG_8119.jpg")
     
     
     
@@ -157,31 +155,50 @@ def ask_VLM(result_image=None, instruction=None):
     # }
 
 
+    # payload = {
+    #     "model": "gpt-4o",  # gpt-4o gpt-4-vision-preview
+    #     "messages": [
+    #         {
+    #             "role": "user",
+    #             "content": [
+    #                 {"type": "text", "text": f"Instruction: {instruction}. Here are two images. The first image shows what the robot sees, and the second image shows object segmentation annotations."},
+    #                 {
+    #                     "type": "image_url",
+    #                     "image_url": {
+    #                         "url": f"data:image/jpeg;base64,{img_str}"
+    #                     },
+    #                 },
+    #                 {
+    #                     "type": "image_url",
+    #                     "image_url": {
+    #                         "url": f"data:image/jpeg;base64,{segmented_img_str}"
+    #                     },
+    #                 },
+    #                 {"type": "text", "text": "Please identify the obj_i in the images that corresponds to the target object described in the instruction and provide a reason. Please respond in the format: 'Answer: obj_i, Reason: ...'. Note: 1. If the target object is in the image but not marked by a bounding box, respond with 'Answer: false_1, Reason: object hear, bbox not hear'. 2. If the target object is not in the image at all, respond with 'Answer: false_2, Reason: object not hear'."}
+    #             ],
+    #         }
+    #     ],
+    #     "max_tokens": 20,  # 修改为适当的值
+    # }
     payload = {
         "model": "gpt-4o",  # gpt-4o gpt-4-vision-preview
         "messages": [
             {
                 "role": "user",
                 "content": [
-                    {"type": "text", "text": f"Instruction: {instruction}. Here are two images. The first image shows what the robot sees, and the second image shows object segmentation annotations."},
+                    {"type": "text", "text": f"Instruction: {instruction}. "},
                     {
                         "type": "image_url",
                         "image_url": {
                             "url": f"data:image/jpeg;base64,{img_str}"
                         },
-                    },
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": f"data:image/jpeg;base64,{segmented_img_str}"
-                        },
-                    },
-                    {"type": "text", "text": "Please identify the obj_i in the images that corresponds to the target object described in the instruction and provide a reason. Please respond in the format: 'Answer: obj_i, Reason: ...'. Note: 1. If the target object is in the image but not marked by a bounding box, respond with 'Answer: false_1, Reason: object hear, bbox not hear'. 2. If the target object is not in the image at all, respond with 'Answer: false_2, Reason: object not hear'."}
+                    },                    
                 ],
             }
         ],
         "max_tokens": 20,  # 修改为适当的值
     }
+
 
 
     response = requests.post(
