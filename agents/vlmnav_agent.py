@@ -475,7 +475,9 @@ class VLMNav_Agent(ObjectNav_Agent):
             )
         self.open3d_reset = False
         self.last_action = action
-        return action
+
+        # return action
+        return None
 
     def Bbox_prompt(self, candidate_objects, candidate_landmarks):
         # Target object

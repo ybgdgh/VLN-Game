@@ -26,7 +26,7 @@ def get_args():
                                 (default: 0)""")
     parser.add_argument('--print_images', type=int, default=0,
                         help='1: save visualization as images')
-    parser.add_argument('--save_video', type=int, default=1,
+    parser.add_argument('--save_video', type=int, default=0,
                         help='1: save visualization as video')
     parser.add_argument('-n', '--num_processes', type=int, default=1)
     parser.add_argument('--rank', type=int, default=0)

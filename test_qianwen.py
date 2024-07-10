@@ -2,9 +2,18 @@ from http import HTTPStatus
 import dashscope
 import os
 
+import base64
+import os
+import requests
+import io
+import json
+from PIL import Image, ImageDraw, ImageFont
+import re
+
+
 api_key = os.environ.get('DASHSCOPE_API_KEY')
 
-def simple_multimodal_conversation_call():
+def ask_VLM():
     """Simple single round multimodal conversation call.
     """
     
@@ -50,5 +59,51 @@ def simple_multimodal_conversation_call():
         print(response.message)  # The error message.
 
 
+def ask_VLM_coord(result_image=None, instruction=None):
+    pil_image = Image.open("/home/rickyyzliu/workspace/embodied-AI/habitat/habitat.png")
+    image_size = pil_image.size
+    w = image_size[0]
+    h = image_size[1]
+
+    local_image_path1 = "file:///home/rickyyzliu/workspace/embodied-AI/habitat/habitat.png"
+    text = (
+        # "Frame the table in front of the sofa."
+        # "Frame the table behind the sofa."
+        # "Frame E5 elevator door in the image using bbox."
+        # "框出E8电梯门."
+        # "如果图像中有行人, 请在图像上将该目标用BBox框出来; 如果没有, 则输出文本: “没有行人”。"
+        # "图片里有行人吗"
+        "Frame the TV. "
+    )
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {"image": local_image_path1},
+                {"text": text}
+            ]
+        }
+    ]
+    response = dashscope.MultiModalConversation.call(model='qwen-vl-max',  # qwen-vl-max or qwen-vl-plus
+                                                     messages=messages)
+    if response.status_code == HTTPStatus.OK:
+        print(response)
+    else:
+        print(response.code)  # The error code.
+        print(response.message)  # The error message.
+
+    box_str = response["output"].choices[0].message.content[0]["box"]
+    match = re.search(r'\((\d+),(\d+)\),\((\d+),(\d+)\)', box_str)
+    x1, y1, x2, y2 = map(int, match.groups())
+    x1, y1, x2, y2 = (int(x1 / 1000 * w), int(y1 / 1000 * h), int(x2 / 1000 * w), int(y2 / 1000 * h))
+    print(f"{x1}, {y1}, {x2}, {y2}")
+    draw = ImageDraw.Draw(pil_image)
+    draw.rectangle([x1, y1, x2, y2], outline='red', width=5)
+
+    pil_image.show()
+    print("finished!")
+
+
 if __name__ == '__main__':
-    simple_multimodal_conversation_call()
+    # ask_VLM()
+    ask_VLM_coord()
