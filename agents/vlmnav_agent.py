@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 import base64
 import requests
+from http import HTTPStatus
+import dashscope
+from PIL import Image, ImageDraw, ImageFont
+import re
 
 import math
 import time
@@ -111,7 +115,7 @@ class VLMNav_Agent(ObjectNav_Agent):
             )
 
             self.text_queries = observations["instruction"]["text"]  # 得到instruction
-            self.text_queries = "chair."
+            # self.text_queries = "chair."
 
             # 用LLM做一个拆分
             # self.chat_history_for_llm = []
@@ -278,11 +282,21 @@ class VLMNav_Agent(ObjectNav_Agent):
             if text_input is not None:
                 self.text_queries = text_input
 
-        if len(self.candidate_objects) == 0:
+        if len(self.candidate_objects) == 0 or True:
+            user_input = input("Enter whether using VLM (1: true): ")
+            key_map = {
+                "1": 1,
+            }
+            if user_input in key_map:
+                use_vlm = True
+            else:
+                print("Invalid input. Not using vlm.")
+                use_vlm = False
+
             if use_vlm:
+
                 # 已经得到了result image 对VLM进行提问
-                # answer = self.ask_VLM(image, segemented_image, self.text_queries)
-                answer = "false_1"
+                answer = self.ask_VLM(image, segemented_image, self.text_queries)
 
                 """
                 函数会返回object的index, 或者是两种失败情况, 现在就考虑简单一点, 
@@ -298,7 +312,7 @@ class VLMNav_Agent(ObjectNav_Agent):
                     print(f"!!!!!!!!!!  found object  !!!!!!!!!!!!!!!!!!! : {index}")
                     self.candidate_id.append(detection_to_object[index])
                     self.candidate_objects = [self.objects[self.candidate_id[0]]]
-            
+
         # ------------------------------------------------------------------
         ##### 7. frontier selection
         # ------------------------------------------------------------------
@@ -310,7 +324,6 @@ class VLMNav_Agent(ObjectNav_Agent):
             self.nearest_point = self.find_nearest_point_cloud(self.candidate_objects[0]["pcd"], camera_position)
             self.found_goal = True
             print("found goal!")
-
 
         '''
         goal_map为0 代表上次没有发现目标
@@ -373,13 +386,13 @@ class VLMNav_Agent(ObjectNav_Agent):
                 self.goal_map[target_point_list[global_item][0], target_point_list[global_item][1]] = 1
 
             # TODO 这里还删除了一种情况, elif len(self.objects) > 0 and self.l_step > 200:
-            # 如果没有边界存在, 就随机选取 
+            # 如果没有边界存在, 就随机选取
             else:
                 goal_pose_x = int(np.random.rand() * self.map_size)
                 goal_pose_y = int(np.random.rand() * self.map_size)
                 self.goal_map[goal_pose_x, goal_pose_y] = 1
 
-        # TODO goal 0 1 >1 意味着什么 
+        # TODO goal 0 1 >1 意味着什么
         if np.sum(self.goal_map) == 1:  # 选的边界 
             f_pos = np.argwhere(self.goal_map == 1)
             stg = f_pos[0]
@@ -618,10 +631,64 @@ class VLMNav_Agent(ObjectNav_Agent):
         answer_parts = answer.split(", Reason: ")
         obj_i = answer_parts[0].split(": ")[1]
         reason = answer_parts[1]
-        
+
         print(answer)
 
         return obj_i
 
+    def ask_Qwen(self, raw_image, instruction):
+        pil_image = Image.fromarray(np.uint8(raw_image))
+        buffered = io.BytesIO()
+        pil_image.save(buffered, format="JPEG")
+        img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
 
-    # def ask_qianwen
+        # prompt in English
+        text = (
+            "Assume you are the navigation unit of a robot. The image shows what the robot sees. "
+            "Your task is to identify the object in the image that corresponds to the target object described in the instruction. "
+            "If you find the target object in the image, please accurately provide its coordinates (x, y) in the image, representing the center of the object. "
+            f"Note: The coordinates of the image top left corner is (0, 0), and the image size (width, height) is {image_size}. "
+            "Please ensure the accuracy of the coordinates and provide the output in JSON format, without any Markdown syntax, such as "
+            '{"found_object": "True", "object_coordinate": ..., "reason": ...}'
+            f"\n\nInstruction: {instruction}"
+        )
+
+        # prompt in Chinese
+
+        # text = (
+        #     "框出E8电梯门."
+        # )
+
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {"image": img_str},
+                    {"text": text}
+                ]
+            }
+        ]
+
+        # qwen-vl-max or qwen-vl-plus
+        response = dashscope.MultiModalConversation.call(model='qwen-vl-max',
+                                                     messages=messages)
+
+        if response.status_code == HTTPStatus.OK:
+            print(response)
+        else:
+            print(response.code)
+            print(response.message)  # The error message.
+
+        print(response["output"].choices[0].message.content)
+
+
+        box_str = response["output"].choices[0].message.content[0]["box"]
+        match = re.search(r'\((\d+),(\d+)\),\((\d+),(\d+)\)', box_str)
+        x1, y1, x2, y2 = map(int, match.groups())
+        x1, y1, x2, y2 = (int(x1 / 1000 * w), int(y1 / 1000 * h), int(x2 / 1000 * w), int(y2 / 1000 * h))
+        print(f"{x1}, {y1}, {x2}, {y2}")
+        draw = ImageDraw.Draw(pil_image)
+        draw.rectangle([x1, y1, x2, y2], outline='red', width=5)
+        
+        pil_image.show()
+        print("finished!")

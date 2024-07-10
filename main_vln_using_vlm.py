@@ -117,7 +117,6 @@ def main(args, send_queue, receive_queue):
             use_vlm = count_steps % 50 == 0
             action = agent.act(obs, agent_state, use_vlm, send_queue, receive_queue)
 
-
             if action == None:
                 continue
             obs = env.step(action)
@@ -127,10 +126,8 @@ def main(args, send_queue, receive_queue):
             action == 0 and 
             env.get_metrics()["spl"]
         ):
-            # print("you successfully navigated to destination point")
             fail_case['success'] += 1
         else:
-            # print("your navigation was not successful")
             if count_steps >= config.ENVIRONMENT.MAX_EPISODE_STEPS - 1:
                 fail_case['exploration'] += 1
             elif agent.replan_count > 20:

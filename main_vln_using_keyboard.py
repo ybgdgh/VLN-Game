@@ -83,7 +83,7 @@ def main(args, send_queue, receive_queue):
     )
 
     agent = VLMNav_Agent(args, follower)
-    
+
     num_episodes = len(env.episodes)
     if args.episode_count > -1:
         num_episodes = min(args.episode_count, len(env.episodes))
@@ -103,9 +103,7 @@ def main(args, send_queue, receive_queue):
         print("Instrcution: ", obs["instruction"]['text'])
         count_steps = 0
         while not env.episode_over:
-            
             agent_state = env.sim.get_agent_state()
-
             use_vlm = count_steps % 50 == 0
             action = agent.act(obs, agent_state, use_vlm, send_queue, receive_queue)
 
@@ -116,7 +114,7 @@ def main(args, send_queue, receive_queue):
                 obs = env.step(action)
                 count_steps += 1
             else:
-                print("Invalid input. Please try again.")
+                print("Invalid input. No action excuting. Please try again.")
 
             if action == None:
                 continue

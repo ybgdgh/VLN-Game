@@ -104,6 +104,63 @@ def ask_VLM_coord(result_image=None, instruction=None):
     print("finished!")
 
 
+def ask_VLM_coord_test(result_image=None, instruction=None):
+    pil_image = Image.open("/home/rickyyzliu/workspace/embodied-AI/habitat/habitat.png")
+    image_size = pil_image.size
+    w = image_size[0]
+    h = image_size[1]
+
+    local_image_path1 = "file:///home/rickyyzliu/workspace/embodied-AI/habitat/habitat.png"
+    
+    # instruction = "In the living room, facing the TV, there is a black office chair in front of the computer desk on the right side."
+    instruction = "person with blue shirt."
+    text = (
+        # "Assume you are the navigation brain of a robot. The image shows what the robot sees. "
+        # "Your task is to identify the object in the image that corresponds to the target object described in the instruction. "
+        # "If you find the target object in the image, please accurately provide its coordinates (x, y) in the image, "
+        # "representing the center of the object. "
+        # # f"Note: The coordinates of the image top left corner is (0, 0), and the image size (width, height) is {image_size}. "
+        # "Please ensure the accuracy of the coordinates and provide the output in JSON format, without any Markdown syntax, such as "
+        # '{"found_object": "True", "object_coordinate": ..., "reason": ...}'
+        # f"\n\nInstruction: {instruction}"
+        f"Instruction: {instruction}."
+        "If the image contains the object corresponding to the target object described in the instruction, "
+        "please frame out it in the image. "
+        "If not, please respond with 'false' in text."
+    )
+
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {"image": local_image_path1},
+                {"text": text}
+            ]
+        }
+    ]
+
+    response = dashscope.MultiModalConversation.call(model='qwen-vl-max',  # qwen-vl-max or qwen-vl-plus
+                                                     messages=messages)
+    if response.status_code == HTTPStatus.OK:
+        print(response)
+    else:
+        print(response.code)  # The error code.
+        print(response.message)  # The error message.
+
+    box_str = response["output"].choices[0].message.content[0]["box"]
+    match = re.search(r'\((\d+),(\d+)\),\((\d+),(\d+)\)', box_str)
+    x1, y1, x2, y2 = map(int, match.groups())
+    x1, y1, x2, y2 = (int(x1 / 1000 * w), int(y1 / 1000 * h), int(x2 / 1000 * w), int(y2 / 1000 * h))
+    print(f"{x1}, {y1}, {x2}, {y2}")
+    draw = ImageDraw.Draw(pil_image)
+    draw.rectangle([x1, y1, x2, y2], outline='red', width=5)
+
+    pil_image.show()
+    print("finished!")
+
+
 if __name__ == '__main__':
     # ask_VLM()
-    ask_VLM_coord()
+    # ask_VLM_coord()
+
+    ask_VLM_coord_test()
