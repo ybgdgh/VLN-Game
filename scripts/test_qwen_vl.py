@@ -23,7 +23,7 @@ def draw_bounding_box(image, response, bounding_box_annotator, label_annotator):
         x1, y1, x2, y2 = (int(x1 / 1000 * w), int(y1 / 1000 * h), int(x2 / 1000 * w), int(y2 / 1000 * h))
         
         coordinates.append([x1, y1, x2, y2])
-        labels.append(label[0])    
+        # labels.append(label[0])    
     
     if len(coordinates) == 0:
         print(response)
@@ -35,11 +35,11 @@ def draw_bounding_box(image, response, bounding_box_annotator, label_annotator):
         scene=image.copy(),
         detections=detections,
     )
-    annotated_frame = label_annotator.annotate(
-        scene=annotated_frame,
-        detections=detections,
-        labels=np.array(labels)
-    )
+    # annotated_frame = label_annotator.annotate(
+    #     scene=annotated_frame,
+    #     detections=detections,
+    #     labels=np.array(labels)
+    # )
     annotated_frame.show()
     
 
@@ -49,9 +49,11 @@ def simple_multimodal_conversation_call():
     
     local_image_path1 = "file:///home/data/teaganli/test_image/indoor_raw.jpeg"
     local_image_path2 = "file:///home/data/teaganli/test_image/indoor_detect.jpg"
-    local_image_path3 = "file:///home/data/teaganli/test_image/IMG_8120.jpg"
+    local_image_path3 = "file:///home/data/teaganli/test_image/IMG_8119.jpg"
+    local_image_path4 = "file:///home/data/teaganli/test_image/elevator_door.jpg"
+    local_image_path5 = "file:///home/data/teaganli/test_image/habitat/h4.png"
     
-    image_path = local_image_path1
+    image_path = local_image_path5
     bounding_box_annotator = sv.BoundingBoxAnnotator(thickness=2)
     label_annotator = sv.LabelAnnotator(text_color=sv.Color.BLACK, 
                                         text_scale=0.5,
@@ -69,29 +71,48 @@ def simple_multimodal_conversation_call():
     #     }
     # ]
     
-    messages = [
-        {
-            "role": "user",
-            "content": [
-                {"text":  f"please draw the bounding boxes of the table in front of the sofa and the small sofa."},
-                {"image": local_image_path1},
-            ]
-        }
-    ]
     # messages = [
     #     {
     #         "role": "user",
     #         "content": [
-    #             # {"text":  f"你现在看到的是电梯井，请在图中画出E3电梯门。要求在途中画出E3不锈钢材质的电梯门的bounding box"},
-    #             {"text":  f"你现在看到的是电梯井，请告诉我你现在在几楼，并且在图中画出楼层标志的bounding box，楼层标志通常是不锈钢材质挂在大理石墙面上"},
-    #             {"image": image_path},
+    #             {"text":  f"please draw the bounding boxes of the table in front of the sofa and the small sofa."},
+    #             {"image": local_image_path1},
     #         ]
     #     }
     # ]
+    instruction = "In the living room, facing the TV, there is a cabinet in front of the computer desk on the right side."
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                # {"text":  f"你现在看到的是电梯井，请在图中画出E3电梯门。要求在途中画出E3不锈钢材质的电梯门的bounding box"},
+                # {"text":  f"你现在看到的是电梯井，请告诉我你现在在几楼，并且在图中画出电梯门的bounding box"},
+                # {"text":  f"你现在看到的是电梯井，在图中画出电梯门的bounding box"},
+                # {"text":  f"Instruction: {instruction}. 请根据instruction首先拆分出这句话中的target物体，并判断图中有没有完全符合instruction中包含的空间关系的target物体，如果包含请在图中画出对应的bounding box，如果没有这个物体，请不要输出bounding box"},
+                # {"text":  
+                #     f"""
+                #     你将会看到的图片是在电脑仿真中的虚拟家庭场景的图片。
+                #     请先描述这张图片描绘的场景。
+                #     我将会给你一段instruction，这段instruction包含了一定的空间关系，请区分出想要的那个target object。
+                #     例如In the living room, facing the TV, there is a cabinet in front of the computer desk on the right side中，target物体是cabinet。
+                #     请判断图中有没有完全符合instruction中包含的空间关系的target物体，这意味着target需要满足instruction中描述的空间关系。
+                #     要求：1. 非常谨慎地判断是否包含target物体并且是否满足Instruction中的空间关系。
+                #          2. 请根据图片中判断物体出现的位置是否合理，例如淋浴间只可能存在于厕所而不可能出现在厨房，如果物体出现的位置不合理也请不要画出。
+                #          3. 只有当置信度足够高时才画出物体，如果不确定请不要画出物体
+                #     如有，请画在图上，如果没有则不要画出。
+                #     Instruction： 沙发
+                #     """},
+                # {"text": "描述这幅图片，并判断这个图片中是否有满足Instruction的物体, 如果有，请输出True，如果没有，请输出False。Instruction： 黑色沙发与电视中间的白色沙发"}, # 如果有请画在图上，如果没有请不要画。 Instruction： find the sofa"},
+                {"text": "请根据Instruction画出对应物体的位置。Instruction： 墙上的画"}, # 如果有请画在图上，如果没有请不要画。 Instruction： find the sofa"},
+                
+                # {"text": "请画出沙发的位置"},
+                {"image": image_path},
+            ]
+        }
+    ]
     response = dashscope.MultiModalConversation.call(model='qwen-vl-max',  # qwen-vl-max or qwen-vl-plus
                                                      messages=messages)
     image = Image.open(image_path.split("//")[1])
-    draw_bounding_box(image, response, bounding_box_annotator, label_annotator)
     
     # The response status_code is HTTPStatus.OK indicate success,
     # otherwise indicate request is failed, you can get error code
@@ -102,6 +123,8 @@ def simple_multimodal_conversation_call():
         print(response.code)  # The error code.
         print(response.message)  # The error message.
 
+    draw_bounding_box(image, response, bounding_box_annotator, label_annotator)
+    
 
 def ocr_qwen():
     local_image_path1 = "file:///home/data/teaganli/test_image/indoor_raw.jpeg"
@@ -130,8 +153,8 @@ def ocr_qwen():
         {
             "role": "user",
             "content": [ 
-                # {"text":  f"你现在看到的是电梯井，请在图中画出E3电梯门。要求在途中画出E3不锈钢材质的电梯门的bounding box"},
-                {"text":  f"你现在看到的是电梯井，我们先进行了OCR识别，识别到的字符：{label}，并且他们的bounding box在图上的位置是{xyxy}。通常电梯编号是一个英文字母与一个数字结合，比如A1，并且电梯编号通常在电梯门的上面。楼层的编号是二位数字，比如03.请告诉我你看到的电梯编号与楼层信息，并在图中画出E8电梯的位置"},
+                {"text":  f"你现在看到的是电梯井，请在图中画出E3电梯门。要求在途中画出E3不锈钢材质的电梯门的bounding box"},
+                # {"text":  f"你现在看到的是电梯井，我们先进行了OCR识别，识别到的字符：{label}，并且他们的bounding box在图上的位置是{xyxy}。通常电梯编号是一个英文字母与一个数字结合，比如A1，并且电梯编号通常在电梯门的上面。楼层的编号是二位数字，比如03.请告诉我你看到的电梯编号与楼层信息，并在图中画出E8电梯的位置"},
                 {"image": image_path},
             ]
         }
